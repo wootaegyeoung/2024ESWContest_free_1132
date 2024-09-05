@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>yolov5_KTH</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            text-align: center;
+            background-color: #1e1e1e; /* 어두운 배경 색상 */
+            color: #e0e0e0; /* 연한 회색 글씨 색상 */
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #00bcd4; /* 제목 색상 */
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+
+        .video-container,
+        .percentage-bar-container,
+        .snapshot-container {
+            margin-bottom: 30px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 20px;
+        }
+
+        .video-container img {
+            width: 100%;
+            max-width: 100%; /* 비율 유지 */
+            border: 3px solid #00bcd4; /* 영상 테두리 색상 */
+            border-radius: 8px;
+        }
+
+        .percentage-bar-container {
+            width: 100%;
+        }
+
+        .percentage-bar {
+            height: 20px;
+            background-color: #4caf50; /* 기본 배경 색상 */
+            width: 0%; /* 퍼센트 바의 초기 너비 */
+            border-radius: 10px;
+            position: relative;
+            display: inline-block;
+            transition: width 0.5s ease-in-out; /* 너비 변화 시 부드러운 전환 */
+        }
+
+        .percentage-bar::after {
+            content: attr(data-percentage);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-weight: bold;
+            font-size: 1rem;
+        }
+
+        .snapshot-container {
+            max-width: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .snapshot-container img {
+            width: 150px; /* 스냅샷 이미지의 너비 조정 */
+            height: auto;
+            margin: 10px;
+            border: 2px solid #00bcd4; /* 스냅샷 테두리 색상 */
+            border-radius: 8px;
+            cursor: pointer; /* 포인터 커서 추가 */
+        }
+
+        .title {
+            margin: 20px 0;
+            color: #00bcd4; /* 제목 색상 */
+            text-align: center;
+            font-size: 1.5rem;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            z-index: 1; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgb(0,0,0); /* Fallback color */
+            background-color: rgba(0,0,0,0.8); /* Black w/ opacity */
+        }
+
+        .modal-content {
+            margin: 15% auto;
+            padding: 20px;
+            width: 80%;
+            max-width: 700px;
+        }
+
+        .modal-content img {
+            width: 100%;
+            height: auto;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #fff;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .percentage-bar-container,
+            .snapshot-container {
+                width: 100%;
+            }
+
+            .snapshot-container img {
+                width: 100px;
+                margin: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>KTH Yolov5</h1>
+        <div class="video-container">
+            <h2>실시간 영상</h2>
+            <img src="{{ url_for('video_feed') }}" alt="Video Feed">
+        </div>
+        <div class="percentage-bar-container">
+            <h2 class="title">Bounding Box 퍼센트 바</h2>
+            <div id="percentage-bar" class="percentage-bar" data-percentage="0%"></div>
+        </div>
+        <div class="snapshot-container">
+            <h2 class="title">탐지된 사람의 스냅샷</h2>
+            <div id="snapshots"></div>
+        </div>
+    </div>
+
+    <!-- The Modal -->
+    <div id="myModal" class="modal">
+        <span class="close">&times;</span>
+        <div class="modal-content">
+            <img id="modalImage" src="" alt="Enlarged Snapshot">
+        </div>
+    </div>
+
+    <script>
+        async function fetchSnapshots() {
+            try {
+                const response = await fetch('/snapshots');
+                if (!response.ok) throw new Error('Network response was not ok');
+                const snapshots = await response.json();
+                const snapshotsContainer = document.getElementById('snapshots');
+                snapshotsContainer.innerHTML = '';
+
+                snapshots.forEach(snapshot => {
+                    const img = document.createElement('img');
+                    img.src = snapshot.path;
+                    img.alt = snapshot.timestamp;
+                    img.className = 'snapshot';
+                    img.dataset.timestamp = snapshot.timestamp; // Add a data attribute for timestamp
+                    img.addEventListener('click', handleSnapshotClick); // Add click event listener
+                    snapshotsContainer.appendChild(img);
+                });
+            } catch (error) {
+                console.error('Failed to fetch snapshots:', error);
+            }
+        }
+
+        function handleSnapshotClick(event) {
+            const imgSrc = event.target.src;
+            const modal = document.getElementById('myModal');
+            const modalImage = document.getElementById('modalImage');
+            modalImage.src = imgSrc;
+            modal.style.display = 'block';
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('myModal');
+            modal.style.display = 'none';
+        }
+
+        // Get the modal and close button elements
+        const modal = document.getElementById('myModal');
+        const span = document.getElementsByClassName('close')[0];
+
+        // When the user clicks on the close button, close the modal
+        span.onclick = function() {
+            closeModal();
+        }
+
+        // When the user clicks anywhere outside of the modal, close it
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
+        async function fetchObjectSize() {
+            try {
+                const response = await fetch('/object_size');
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+                const percentage = data.size_percentage || 0;
+                const percentageBar = document.getElementById('percentage-bar');
+                const roundedPercentage = Math.round(percentage / 10) * 10; // Round to nearest 10
+                percentageBar.style.width = `${roundedPercentage}%`;
+                percentageBar.setAttribute('data-percentage', `${roundedPercentage}%`);
+
+                // Change color to red if percentage exceeds 50%
+                if (roundedPercentage > 50) {
+                    percentageBar.style.backgroundColor = '#f44336'; // Red color
+                    percentageBar.style.borderColor = '#f44336'; // Red border
+                } else {
+                    percentageBar.style.backgroundColor = '#4caf50'; // Green color
+                    percentageBar.style.borderColor = '#4caf50'; // Green border
+                }
+            } catch (error) {
+                console.error('Failed to fetch object size:', error);
+            }
+        }
+
+        // Fetch snapshots and object size on intervals
+        setInterval(fetchSnapshots, 5000);
+        setInterval(fetchObjectSize, 1000);
+    </script>
+</body>
+</html>
